@@ -1,111 +1,90 @@
-const board = document.getElementById("board");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const scoreDisplay = document.getElementById("score");
 const message = document.getElementById("message");
 
-let size = 3;
-let tiles = [];
+const box = 20;
+const canvasSize = 400;
 
-function setSize(newSize){
+let snake = [{x: 9*box, y: 9*box}];
+let direction = "RIGHT"; // beginrichting
+let score = 0;
 
-size = newSize;
-startGame();
+// genereer voedsel
+let food = {
+  x: Math.floor(Math.random()*20)*box,
+  y: Math.floor(Math.random()*20)*box
+};
 
-}
+document.addEventListener("keydown", setDirection);
 
-function startGame(){
-
-tiles = [];
-
-for(let i=1;i<size*size;i++){
-tiles.push(i);
-}
-
-tiles.push(null);
-
-tiles = tiles.sort(()=>Math.random()-0.5);
-
-draw();
-
+function setDirection(e){
+  if(e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+  if(e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+  if(e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+  if(e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
 }
 
 function draw(){
+  // clear canvas
+  ctx.fillStyle = "black";
+  ctx.fillRect(0,0,canvasSize,canvasSize);
 
-board.innerHTML="";
+  // draw snake
+  for(let i=0;i<snake.length;i++){
+    ctx.fillStyle = i===0 ? "lime" : "green";
+    ctx.fillRect(snake[i].x,snake[i].y,box,box);
+    ctx.strokeStyle="black";
+    ctx.strokeRect(snake[i].x,snake[i].y,box,box);
+  }
 
-board.style.gridTemplateColumns = `repeat(${size},80px)`;
-
-tiles.forEach((num,index)=>{
-
-let tile = document.createElement("div");
-
-if(num===null){
-tile.className="tile empty";
-}else{
-tile.className="tile";
-tile.textContent=num;
+  // draw food
+  ctx.fillStyle="red";
+  ctx.fillRect(food.x,food.y,box,box);
 }
 
-tile.addEventListener("click",()=>move(index));
+function update(){
+  let head = {...snake[0]};
 
-board.appendChild(tile);
+  // beweeg de kop
+  if(direction==="UP") head.y -= box;
+  if(direction==="DOWN") head.y += box;
+  if(direction==="LEFT") head.x -= box;
+  if(direction==="RIGHT") head.x += box;
 
-});
+  // check botsing met muren
+  if(head.x < 0 || head.x >= canvasSize || head.y < 0 || head.y >= canvasSize){
+    clearInterval(game);
+    message.textContent = "💀 Game Over!";
+    return;
+  }
 
-checkWin();
+  // check botsing met zichzelf
+  for(let i=0;i<snake.length;i++){
+    if(head.x === snake[i].x && head.y === snake[i].y){
+      clearInterval(game);
+      message.textContent = "💀 Game Over!";
+      return;
+    }
+  }
 
+  snake.unshift(head);
+
+  // check voedsel
+  if(head.x === food.x && head.y === food.y){
+    score += 10;
+    scoreDisplay.textContent = score;
+    // nieuw voedsel
+    food = {
+      x: Math.floor(Math.random()*20)*box,
+      y: Math.floor(Math.random()*20)*box
+    };
+  }else{
+    snake.pop();
+  }
+
+  draw();
 }
 
-function move(index){
-
-let emptyIndex = tiles.indexOf(null);
-
-let row = Math.floor(index/size);
-let col = index%size;
-
-let emptyRow = Math.floor(emptyIndex/size);
-let emptyCol = emptyIndex%size;
-
-let distance =
-Math.abs(row-emptyRow)+Math.abs(col-emptyCol);
-
-if(distance===1){
-
-[tiles[index],tiles[emptyIndex]] =
-[tiles[emptyIndex],tiles[index]];
-
-draw();
-
-}
-
-}
-
-function solve(){
-
-tiles = [];
-
-for(let i=1;i<size*size;i++){
-tiles.push(i);
-}
-
-tiles.push(null);
-
-draw();
-
-}
-
-function checkWin(){
-
-let win = [];
-
-for(let i=1;i<size*size;i++){
-win.push(i);
-}
-
-win.push(null);
-
-if(JSON.stringify(tiles)===JSON.stringify(win)){
-message.textContent="🏆 Gewonnen!";
-}
-
-}
-
-startGame();
+// start game
+let game = setInterval(update,150);
