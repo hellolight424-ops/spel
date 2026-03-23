@@ -2,27 +2,21 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Schuifpuzzel</title>
+<title>Snake Spel</title>
 <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<h1>🧩 Schuifpuzzel</h1>
+<h1>🐍 Snake Game</h1>
 
-<div class="controls">
-<button onclick="setSize(3)">3x3</button>
-<button onclick="setSize(4)">4x4</button>
-<button onclick="setSize(5)">5x5</button>
-
-<button onclick="solve()">Fix puzzel</button>
+<div class="info">
+Score: <span id="score">0</span>
 </div>
 
-<div id="board"></div>
+<canvas id="game" width="400" height="400"></canvas>
 
 <p id="message"></p>
 
 <script src="script.js"></script>
-
 </body>
 </html>
