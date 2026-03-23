@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modern Snake Game</title>
+  <style>
+    body {
+      background-color: #2c3e50;
+      color: #ecf0f1;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    #score-board {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      background: #34495e;
+      padding: 10px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    /* Container voor de canvas en game over overlay */
+    #game-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      background-color: #a2d149;
+      border-radius: 10px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+      /* Dambord patroon voor een klassieke feel */
+      background-image: linear-gradient(45deg, #aad751 25%, transparent 25%, transparent 75%, #aad751 75%, #aad751),
+                        linear-gradient(45deg, #aad751 25%, transparent 25%, transparent 75%, #aad751 75%, #aad751);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 20px;
+    }
+
+    #game-over {
+      display: none;
+      position: absolute;
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 40px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover { background-color: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>Snake</h1>
+  <div id="score-board">Score: <span id="score">0</span></div>
+  
+  <div id="game-container">
+    <canvas id="game" width="400" height="400"></canvas>
+    
+    <div id="game-over">
+      <h2>Game Over!</h2>
+      <p style="font-size: 18px;">Je score was: <span id="final-score" style="font-weight: bold; color: #f1c40f;">0</span></p>
+      <button onclick="resetGame()">Opnieuw Spelen</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score");
+    const gameOverScreen = document.getElementById("game-over");
+    const finalScoreDisplay = document.getElementById("final-score");
+
+    const grid = 20;
+    const canvasSize = 400;
+    
+    // Game variabelen
+    let snake = [];
+    let direction = {x: 1, y: 0};
+    let nextDirection = {x: 1, y: 0}; // Voorkomt snelle dood-klikken
+    let apple = {};
+    let score = 0;
+    let isGameOver = false;
+    
+    // Timing variabelen om de snelheid te bepalen
+    let lastRenderTime = 0;
+    const snakeSpeed = 10; // Aantal vakjes per seconde
+
+    function init() {
+      // Start met een slang van 3 blokjes lang
+      snake = [
+        {x: 8 * grid, y: 8 * grid},
+        {x: 7 * grid, y: 8 * grid},
+        {x: 6 * grid, y: 8 * grid}
+      ];
+      direction = {x: 1, y: 0};
+      nextDirection = {x: 1, y: 0};
+      score = 0;
+      scoreDisplay.textContent = score;
+      isGameOver = false;
+      gameOverScreen.style.display = "none";
+      spawnApple();
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener("keydown", (e) => {
+      // Gebruik nextDirection zodat we pas updaten in de volgende frame
+      if (e.key === "ArrowUp" && direction.y === 0) nextDirection = {x: 0, y: -1};
+      if (e.key === "ArrowDown" && direction.y === 0) nextDirection = {x: 0, y: 1};
+      if (e.key === "ArrowLeft" && direction.x === 0) nextDirection = {x: -1, y: 0};
+      if (e.key === "ArrowRight" && direction.x === 0) nextDirection = {x: 1, y: 0};
+    });
+
+    function spawnApple() {
+      while (true) {
+        apple = {
+          x: Math.floor(Math.random() * (canvasSize / grid)) * grid,
+          y: Math.floor(Math.random() * (canvasSize / grid)) * grid
+        };
+        // Controleer of de appel niet toevallig in de slang spawnt
+        if (!snake.some(part => part.x === apple.x && part.y === apple.y)) {
+          break;
+        }
+      }
+    }
+
+    function draw() {
+      // Maak het canvas leeg
+      ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+      // Teken de appel (rond)
+      ctx.fillStyle = "#e74c3c";
+      ctx.beginPath();
+      // + grid/2 om het middelpunt te vinden, grid/2 - 2 voor iets kleinere straal
+      ctx.arc(apple.x + grid / 2, apple.y + grid / 2, grid / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Teken de slang
+      snake.forEach((part, index) => {
+        // Het hoofd is iets donkerder blauw
+        ctx.fillStyle = index === 0 ? "#2980b9" : "#3498db";
+        
+        // Teken een vierkant met licht afgeronde hoekjes
+        ctx.beginPath();
+        ctx.roundRect(part.x + 1, part.y + 1, grid - 2, grid - 2, 5);
+        ctx.fill();
+        
+        // Teken oogjes als het het hoofd is (index 0)
+        if (index === 0) {
+          ctx.fillStyle = "white";
+          let eye1X, eye1Y, eye2X, eye2Y;
+          const eyeOffset = 5;
+          const eyeSize = 3;
+          
+          // Bepaal waar de oogjes moeten staan op basis van de richting
+          if (direction.x === 1) { // Naar rechts
+            eye1X = part.x + grid - eyeOffset; eye1Y = part.y + eyeOffset;
+            eye2X = part.x + grid - eyeOffset; eye2Y = part.y + grid - eyeOffset;
+          } else if (direction.x === -1) { // Naar links
+            eye1X = part.x + eyeOffset; eye1Y = part.y + eyeOffset;
+            eye2X = part.x + eyeOffset; eye2Y = part.y + grid - eyeOffset;
+          } else if (direction.y === -1) { // Naar boven
+            eye1X = part.x + eyeOffset; eye1Y = part.y + eyeOffset;
+            eye2X = part.x + grid - eyeOffset; eye2Y = part.y + eyeOffset;
+          } else { // Naar beneden
+            eye1X = part.x + eyeOffset; eye1Y = part.y + grid - eyeOffset;
+            eye2X = part.x + grid - eyeOffset; eye2Y = part.y + grid - eyeOffset;
+          }
+          
+          ctx.beginPath(); ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI*2); ctx.fill();
+        }
+      });
+    }
+
+    function update() {
+      // Pas richting aan naar de input
+      direction = nextDirection;
+      const head = {x: snake[0].x + direction.x * grid, y: snake[0].y + direction.y * grid};
+
+      // Botsing met de muren
+      if (head.x < 0 || head.x >= canvasSize || head.y < 0 || head.y >= canvasSize) {
+        return gameOver();
+      }
+
+      // Botsing met zichzelf
+      if (snake.some(part => part.x === head.x && part.y === head.y)) {
+        return gameOver();
+      }
+
+      // Voeg nieuw hoofd toe
+      snake.unshift(head);
+
+      // Controleer of de appel gegeten is
+      if (head.x === apple.x && head.y === apple.y) {
+        score++;
+        scoreDisplay.textContent = score;
+        spawnApple();
+      } else {
+        // Als we geen appel eten, verwijder dan het staartje
+        snake.pop();
+      }
+    }
+
+    function gameOver() {
+      isGameOver = true;
+      finalScoreDisplay.textContent = score;
+      gameOverScreen.style.display = "block";
+    }
+
+    // Wordt aangeroepen door de HTML knop
+    function resetGame() {
+      init();
+    }
+
+    // De main loop die de framerate regelt
+    function gameLoop(currentTime) {
+      if (isGameOver) return; // Stop de loop als we game over zijn
+
+      window.requestAnimationFrame(gameLoop);
+      
+      const secondsSinceLastRender = (currentTime - lastRenderTime) / 1000;
+      // Zorg ervoor dat de game niet sneller update dan snakeSpeed toelaat
+      if (secondsSinceLastRender < 1 / snakeSpeed) return;
+      
+      lastRenderTime = currentTime;
+
+      update();
+      draw();
+    }
+
+    // Start het spel voor de eerste keer
+    init();
+
+  </script>
+</body>
+</html>
